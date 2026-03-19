@@ -2,7 +2,7 @@
 
 A Jupyter notebook that implements the **BDEW 2D4 sigmoid profile formula** for
 daily gas demand estimation from temperature, extended with **machine-learning
-models** for d+7 and d+14 forward forecasting.
+models** for d+3 and d+7 forward forecasting.
 
 ---
 
@@ -70,16 +70,17 @@ where **Kundenwert = 778.5 MWh/d** is the contracted annual daily average.
 | 9.5 | Feature importance (Random Forest & Gradient Boosting) |
 | 9.6 | Predictions vs 2D4 formula — time series |
 | 9.7 | Learned h(T) curves vs 2D4 sigmoid |
-| **9.8** | **Lag forecast: d+7 and d+14 — all 5 models trained per lag** |
+| **9.8** | **Lag forecast: d+3 and d+7 — all 5 models trained per lag** |
 | 9.8a | Metrics table: MAE, RMSE, R² — all models × both lags |
 | 9.8b | Commentary: which model is best, limitations |
+| **9.8c** | **d+3 vs d+7: quantitative improvement comparison** |
 | 9.9 | Cross-validation (5-fold, time-ordered) |
 
 ---
 
 ## ML Models
 
-Five models are trained for **each forecast horizon** (d+7 and d+14):
+Five models are trained for **each forecast horizon** (d+3 and d+7):
 
 | Model | Type |
 |---|---|
@@ -106,15 +107,40 @@ For each origin day **d**, predicting target day **d+lag**:
 
 - **Same-day prediction**: all ML models achieve R² > 0.99 — they learn the
   deterministic 2D4 sigmoid near-perfectly from temperature alone.
-- **d+7 forecast**: R² drops significantly as temperature persistence over
-  7 days is weak (~0.3–0.5 autocorrelation). Models rely on seasonal calendar
-  features more than the temperature signal.
-- **d+14 forecast**: temperature persistence is largely noise. Performance
-  approaches a climatological baseline.
-- **Best model for d+7**: Gradient Boosting — handles non-linearity, corrects
-  residuals, and degrades least at longer horizons.
+- **d+3 forecast**: temperature autocorrelation at lag-3 is ~0.6–0.8, meaning
+  today's temperature is still a meaningful predictor. Models capture both the
+  temperature signal and seasonal shape reliably.
+- **d+7 forecast**: autocorrelation drops to ~0.3–0.5. Models shift reliance
+  toward seasonal calendar features; the temperature nudge adds limited value.
+- **Best model for both horizons**: Gradient Boosting — handles non-linearity,
+  corrects residuals iteratively, and degrades least at longer horizons.
 - **Worst months**: shoulder seasons (Mar–Apr, Oct–Nov) where the sigmoid is
   steepest and temperature uncertainty propagates most to demand error.
+
+## d+3 vs d+7: How Much Better?
+
+Shorter horizon consistently wins across all models and all metrics. The
+improvement comes from stronger temperature persistence at 3 days vs 7 days.
+
+| What improves | Why |
+|---|---|
+| **Lower MAE / RMSE** | Temperature at d is a better proxy for d+3 than d+7 |
+| **Higher R²** | More variance explained when temp signal is still strong |
+| **Lower bias** | Less seasonal drift to correct over a shorter window |
+
+Key patterns to look for in the metrics (section 9.8c):
+
+- **Tree models (RF, GB)** tend to gain the most from d+3 — they can exploit
+  the non-linear temperature signal that is strong at lag-3 but weak at lag-7.
+- **Linear models** gain less — they already rely mostly on the polynomial
+  temperature terms and seasonal features, which don't change as dramatically
+  between the two horizons.
+- **Neural Network** gain depends on training convergence — it can match tree
+  models at d+3 if the temperature signal is clean enough to learn.
+- **In winter** (steep sigmoid): d+3 advantage is largest because a ±2°C
+  error at d+3 vs ±5°C at d+7 translates directly to a large demand difference.
+- **In summer** (flat sigmoid): both horizons perform similarly — temperature
+  barely affects the profile factor, so the horizon gap narrows.
 
 ---
 
